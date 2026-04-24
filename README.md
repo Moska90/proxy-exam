@@ -1,58 +1,67 @@
-# Hecho por: Hugo Mata
-# Proyecto de Proxy Inverso y Balanceo de Carga
+# Calamot Nexus | Infraestructura con Proxy Inverso
 
-Este proyecto implementa una infraestructura de red robusta utilizando Docker y Nginx. Consiste en un proxy inverso que actúa como balanceador de carga para dos servidores web que sirven el mismo contenido de forma sincronizada.
+Este proyecto implementa una solución de alta disponibilidad y balanceo de carga utilizando contenedores Docker.
 
-## Requisitos Previos
+## Arquitectura del Sistema
 
-Antes de comenzar, asegúrate de tener instalado en tu sistema:
-*   [Docker](https://docs.docker.com/get-docker/)
-*   [Docker Compose](https://docs.docker.com/compose/install/)
-
-## Estructura del Proyecto
-
-*   `proxy-exam/`
-    *   `docker-compose.yml`: Configuración de la orquestación de los contenedores.
-    *   `nginx.conf`: Configuración del proxy inverso y reglas de balanceo.
-    *   `html/`: Directorio que contiene el sitio web compartido (HTML, imágenes, vídeos).
-    *   `README.md`: Este archivo.
-
-## Instalación y Despliegue
-
-Sigue estos pasos para poner en marcha el entorno:
-
-1.  **Navega al directorio del proyecto:**
-    ```bash
-    cd proxy-exam
-    ```
-
-2.  **Levanta los contenedores:**
-    ```bash
-    docker compose up -d
-    ```
-
-Este comando descargará las imágenes oficiales de Nginx, creará una red interna aislada y arrancará los tres servicios (el proxy y los dos servidores web).
-
-## Verificación
-
-Una vez desplegado, puedes acceder al sitio web abriendo tu navegador en:
-`http://localhost`
-
-### Cómo comprobar el balanceo de carga
-El proxy añade una cabecera personalizada llamada `X-Backend-Server` que te permite saber qué servidor interno está respondiendo. Puedes verificarlo con el siguiente comando en la terminal:
-
-```bash
-curl -I http://localhost
+```text
+          [ CLIENTE (Internet/Host) ]
+                      |
+                      ▼
+              [ PUERTO 80 (Host) ]
+                      |
+      ┌───────────────┴───────────────┐
+      │                               │
+      │        NGINX PROXY            │ (Balanceador de Carga)
+      │      (exam-nginx-proxy)       │
+      │                               │
+      └───────┬───────────────┬───────┘
+              │               │
+      ┌───────▼───────┐       ┌───────▼───────┐
+      │               │       │               │
+      │  WEB SERVER 1 │       │  WEB SERVER 2 │ (Aislados)
+      │               │       │               │
+      └───────┬───────┘       └───────┬───────┘
+              │               │
+              └───────┬───────┘
+                      ▼
+              [ VOLUMEN COMPARTIDO ]
+                   (Carpeta ./html)
 ```
 
-Busca la línea que empieza por `X-Backend-Server`. Si refrescas varias veces, verás cómo alterna entre las IPs internas de los dos servidores web.
+## Decisiones de Diseño
 
-## Detalles Técnicos
+### 1. Selección de Imagen Docker (`nginx:latest`)
+Hemos elegido la imagen oficial de **Nginx** por las siguientes razones:
+*   **Estabilidad y Seguridad**: Es la imagen oficial mantenida por el equipo de Nginx, lo que garantiza parches de seguridad frecuentes.
+*   **Rendimiento**: Es extremadamente ligera y está optimizada para manejar miles de conexiones simultáneas con un consumo mínimo de recursos.
+*   **Versatilidad**: Permite funcionar tanto como servidor web estático como proxy inverso avanzado sin necesidad de software adicional.
 
-*   **Puerto 80**: El proxy es el único servicio accesible desde el host a través del puerto 80.
-*   **Aislamiento**: Los servidores web (`web1` y `web2`) están en una red interna privada y no pueden ser accedidos directamente desde el host, solo a través del proxy.
-*   **Volumen Compartido**: Ambos servidores web montan la carpeta `./html` en modo lectura, lo que garantiza que el contenido sea idéntico en ambos nodos.
+### 2. Estructura de Red (Bridge Interna)
+La red está configurada como una `bridge` interna denominada `internal_network`:
+*   **Seguridad por Aislamiento**: Los servidores web (`web1` y `web2`) no exponen puertos al sistema host. Esto significa que **solo el proxy** puede comunicarse con ellos.
+*   **Resolución DNS Automática**: Docker permite que el proxy se conecte a los backends usando sus nombres de servicio (`http://web1`), simplificando la configuración de Nginx.
+*   **Control de Tráfico**: Centralizar todo el tráfico en el proxy permite implementar políticas de seguridad, logs y balanceo en un único punto.
 
-## Personalización
+## Capturas de Pantalla
 
-Para cambiar el contenido del sitio web, simplemente modifica los archivos dentro de la carpeta `html/`. No es necesario reiniciar los contenedores, ya que los cambios se reflejan en tiempo real gracias al volumen montado.
+![Vista del Portal](proxy-exam1.png)
+*Interfaz de usuario premium de Calamot Nexus.*
+
+![Detalle de Infraestructura](proxy-exam2.png)
+*Visualización de componentes del sistema.*
+
+## Instrucciones de Despliegue
+
+Para poner en marcha todo el sistema, simplemente ejecuta el siguiente comando en la raíz del proyecto:
+
+```bash
+docker compose up -d
+```
+
+### Comandos útiles:
+*   **Ver estado de los contenedores**: `docker compose ps`
+*   **Ver logs en tiempo real**: `docker compose logs -f`
+*   **Detener el sistema**: `docker compose down`
+
+Una vez levantado, el servicio estará disponible en **http://localhost**.
