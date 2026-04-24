@@ -1,0 +1,40 @@
+services:
+  proxy:
+    image: nginx:latest
+    container_name: exam-nginx-proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - web1
+      - web2
+    networks:
+      - internal_network
+
+  web1:
+    image: nginx:latest
+    container_name: exam-web-server-1
+    volumes:
+      - ./html:/usr/share/nginx/html:ro
+    networks:
+      - internal_network
+    # No ports exposed to host
+
+  web2:
+    image: nginx:latest
+    container_name: exam-web-server-2
+    volumes:
+      - ./html:/usr/share/nginx/html:ro
+    networks:
+      - internal_network
+    # No ports exposed to host
+
+networks:
+  internal_network:
+    driver: bridge
+    # The containers are only accessible from the host via the proxy mapping.
+    # To truly isolate them from host-level IP access (if host knows the bridge IP), 
+    # one could use 'internal: true', but that would prevent the proxy from 
+    # reaching the outside world if it didn't have another network.
+    # Given the requirements, not mapping ports is the standard solution.
